@@ -2,6 +2,8 @@
 #include "Coronary.h"
 #include "Helpers.h"
 #include "Callbacks.h"
+#include "ntdll.h"
+#include "ssdt.h"
 
 DRIVER_INITIALIZE DriverEntry;
 DRIVER_UNLOAD DriverUnload;
@@ -16,12 +18,13 @@ void DriverUnload(IN PDRIVER_OBJECT theDriverObject)
 {
 	IoDeleteSymbolicLink(&DosDeviceName);
 	IoDeleteDevice(theDriverObject->DeviceObject);
+
+	Deinitialize();
 }
 
 NTSTATUS CreateCall(PDEVICE_OBJECT DeviceObject, PIRP irp)
 {
 	UNREFERENCED_PARAMETER(DeviceObject);
-
 
 	irp->IoStatus.Status = STATUS_SUCCESS;
 	irp->IoStatus.Information = 0;
@@ -81,6 +84,7 @@ NTSTATUS SteakDispatchDeviceControl(IN OUT DEVICE_OBJECT* DeviceObject, IN OUT I
 			break;
 		}
 
+		// Useless for now.
 		if (NT_SUCCESS(status))
 			szReallyOut = irpStack->Parameters.DeviceIoControl.OutputBufferLength - szOutBuffer;
 
@@ -122,7 +126,18 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT pDriverObject, IN PUNICODE_STRING theRegi
 			pDeviceObject->Flags &= ~DO_DEVICE_INITIALIZING;
 			IoCreateSymbolicLink(&DosDeviceName, &DeviceName);
 
-			getPspCreateProcessNotifyRoutine();
+			if (!NT_SUCCESS(Initialize()))
+			{
+				DbgPrint("[69] Ntdll::Initialize() failed...\r\n");
+				return STATUS_UNSUCCESSFUL;
+			}
+
+			PVOID NtCon = GetFunctionAddress("NtContinue");
+
+			if (!NtCon)
+				DbgPrint("[69] Failed to find NtContinue's Address.");
+			else
+				DbgPrint("[69] Found NtContinue at %p\n", NtCon);
 
 		}
 

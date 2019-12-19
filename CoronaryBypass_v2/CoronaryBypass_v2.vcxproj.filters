@@ -36,6 +36,12 @@
     <ClCompile Include="Callbacks.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ssdt.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ntdll.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Coronary.h">
@@ -48,6 +54,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Callbacks.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ssdt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ntdll.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

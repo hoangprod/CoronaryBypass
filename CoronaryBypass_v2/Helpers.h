@@ -21,6 +21,11 @@ typedef struct _MEMORY_PATTERN_SCAN {
 	MEMORY_OFFSETS Offsets;
 } MEMORY_PATTERN_SCAN, * PMEMORY_PATTERN_SCAN;
 
+void* RtlAllocateMemory(bool InZeroMemory, SIZE_T InSize);
+void RtlFreeMemory(void* InPointer);
+NTSTATUS RtlSuperCopyMemory(IN VOID UNALIGNED* Destination, IN CONST VOID UNALIGNED* Source, IN ULONG Length);
+
+
 OS_INDEX getWindowsIndex();
 
 ULONG getWindowsBuildNumber();

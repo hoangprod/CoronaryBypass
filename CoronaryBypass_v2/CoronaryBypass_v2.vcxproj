@@ -42,7 +42,7 @@
     <Configuration>Debug</Configuration>
     <Platform Condition="'$(Platform)' == ''">Win32</Platform>
     <RootNamespace>CoronaryBypass_v2</RootNamespace>
-    <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -156,12 +156,16 @@
     <ClCompile Include="Helpers.c" />
     <ClCompile Include="Coronary.c" />
     <ClCompile Include="Driver.c" />
+    <ClCompile Include="ntdll.c" />
+    <ClCompile Include="ssdt.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Callbacks.h" />
     <ClInclude Include="Coronary.h" />
     <ClInclude Include="Global.h" />
     <ClInclude Include="Helpers.h" />
+    <ClInclude Include="ntdll.h" />
+    <ClInclude Include="ssdt.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
