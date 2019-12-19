@@ -1,6 +1,7 @@
 #include "Global.h"
 #include "ntdll.h"
 #include "Helpers.h"
+#include "ssdt.h"
 
 unsigned char* FileData = 0;
 ULONG FileSize = 0;
@@ -232,3 +233,4 @@ INT GetExportSsdtIndex(const char* ExportName)
 
     return SsdtOffset;
 }
+ 

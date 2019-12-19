@@ -1,6 +1,6 @@
 #include "Global.h"
-#include "ntdll.h"
 #include "ssdt.h"
+#include "ntdll.h"
 
 extern NTSTATUS NTAPI ZwQuerySystemInformation(
     IN SYSTEM_INFORMATION_CLASS SystemInformationClass,
@@ -166,4 +166,56 @@ PVOID GetFunctionAddress(const char* apiname)
 #else
     return (PVOID)SSDT->pServiceTable[readOffset];
 #endif
+}
+
+
+void Unhook(HOOK hHook, bool free)
+{
+    if (!hHook)
+        return;
+    SSDTStruct* SSDT = SSDTfind();
+    if (!SSDT)
+    {
+        DbgPrint("[TITANHIDE] SSDT not found...\r\n");
+        return;
+    }
+    LONG* SSDT_Table = SSDT->pServiceTable;
+    if (!SSDT_Table)
+    {
+        Log("[TITANHIDE] ServiceTable not found...\r\n");
+        return;
+    }
+    InterlockedSet(&SSDT_Table[hHook->SSDTindex], hHook->SSDTold);
+#ifdef _WIN64
+    if (free)
+        Unhook(hHook, true);
+#else
+    if (free)
+        RtlFreeMemory(hHook);
+#endif
+}
+
+HOOK hook_internal(ULONG_PTR addr, void* newfunc)
+{
+    //allocate structure
+    HOOK hook = (HOOK)RtlAllocateMemory(true, sizeof(HOOKSTRUCT));
+    //set hooking address
+    hook->addr = addr;
+    //set hooking opcode
+#ifdef _WIN64
+    hook->hook.mov = 0xB848;
+#else
+    hook->hook.mov = 0xB8;
+#endif
+    hook->hook.addr = (ULONG_PTR)newfunc;
+    hook->hook.push = 0x50;
+    hook->hook.ret = 0xc3;
+    //set original data
+    RtlCopyMemory(&hook->orig, (const void*)addr, sizeof(HOOKOPCODES));
+    if (!NT_SUCCESS(RtlSuperCopyMemory((void*)addr, &hook->hook, sizeof(HOOKOPCODES))))
+    {
+        RtlFreeMemory(hook);
+        return 0;
+    }
+    return hook;
 }

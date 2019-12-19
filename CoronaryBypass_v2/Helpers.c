@@ -197,3 +197,22 @@ NTSTATUS get_os_pattern(MEMORY_PATTERN_SCAN * pattern, MEMORY_PATTERN_SCAN patte
 
 	return STATUS_NOT_FOUND;
 }
+
+void InterlockedSet(LONG* Destination, LONG Source)
+{
+	//Change memory properties.
+	PMDL g_pmdl = IoAllocateMdl(Destination, sizeof(LONG), 0, 0, NULL);
+	if (!g_pmdl)
+		return;
+	MmBuildMdlForNonPagedPool(g_pmdl);
+	LONG* Mapped = (LONG*)MmMapLockedPages(g_pmdl, KernelMode);
+	if (!Mapped)
+	{
+		IoFreeMdl(g_pmdl);
+		return;
+	}
+	InterlockedExchange(Mapped, Source);
+	//Restore memory properties.
+	MmUnmapLockedPages((PVOID)Mapped, g_pmdl);
+	IoFreeMdl(g_pmdl);
+}
