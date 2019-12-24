@@ -260,10 +260,9 @@ ULONG64 getPspCreateProcessNotifyRoutine()
 
 	if (pStart && pEnd)
 	{
-		ULONG64 test2 = pattern_scan(pStart, pEnd - pStart, Pattern.pattern, NULL, 4, Pattern.Offsets.off0);
 		ULONG64 test = pattern_scan(pStart, pEnd - pStart, Pattern.pattern, (PUCHAR)"xxxxxxxxxxx", 4, Pattern.Offsets.off0);
 
-		DbgPrint("%llx %llx\n", test2, test);
+		DbgPrint("%llx\n", test);
 		return test;
 	}
 

@@ -42,6 +42,9 @@
     <ClCompile Include="ntdll.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Hooks.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Coronary.h">
@@ -60,6 +63,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ntdll.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

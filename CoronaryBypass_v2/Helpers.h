@@ -21,14 +21,25 @@ typedef struct _MEMORY_PATTERN_SCAN {
 	MEMORY_OFFSETS Offsets;
 } MEMORY_PATTERN_SCAN, * PMEMORY_PATTERN_SCAN;
 
+typedef struct _ACE_ARRAY {
+	ACE_HEADER Header;
+	ACCESS_MASK Mask;
+	ULONG SidStart;
+} ACE_ARRAY, * PACE_ARRAY;
+
 void* RtlAllocateMemory(bool InZeroMemory, SIZE_T InSize);
 void RtlFreeMemory(void* InPointer);
 NTSTATUS RtlSuperCopyMemory(IN VOID UNALIGNED* Destination, IN CONST VOID UNALIGNED* Source, IN ULONG Length);
 
+bool isPrivilegeProcess(HANDLE pid);
+
+bool isWriteableObject(PISECURITY_DESCRIPTOR SecurityDescriptor);
 
 OS_INDEX getWindowsIndex();
 
 ULONG getWindowsBuildNumber();
+
+VOID InterlockedSet(LONG* Destination, LONG Source);
 
 BOOLEAN compareMaskPattern(PUCHAR szSource, PCUCHAR szPattern, PCUCHAR szMask);
 

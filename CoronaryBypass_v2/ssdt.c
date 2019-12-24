@@ -1,6 +1,7 @@
 #include "Global.h"
 #include "ssdt.h"
 #include "ntdll.h"
+#include "Helpers.h"
 
 extern NTSTATUS NTAPI ZwQuerySystemInformation(
     IN SYSTEM_INFORMATION_CLASS SystemInformationClass,
@@ -168,6 +169,152 @@ PVOID GetFunctionAddress(const char* apiname)
 #endif
 }
 
+#ifdef _WIN64
+static PVOID FindCaveAddress(PVOID CodeStart, ULONG CodeSize, ULONG CaveSize)
+{
+	unsigned char* Code = (unsigned char*)CodeStart;
+
+	for (unsigned int i = 0, j = 0; i < CodeSize; i++)
+	{
+		if (Code[i] == 0x90 || Code[i] == 0xCC)  //NOP or INT3
+			j++;
+		else
+			j = 0;
+		if (j == CaveSize)
+			return (PVOID)((ULONG_PTR)CodeStart + i - CaveSize + 1);
+	}
+	return 0;
+}
+#endif //_WIN64
+
+
+HOOK Hook2(PVOID api, void* newfunc)
+{
+	ULONG_PTR addr = (ULONG_PTR)api;
+	if (!addr)
+		return 0;
+	DbgPrint("[TITANHIDE] hook 2 (0x%p, 0x%p)\r\n", (void*)addr, newfunc);
+	return hook_internal(addr, newfunc);
+}
+
+HOOK Hook(const char* apiname, void* newfunc)
+{
+	SSDTStruct* SSDT = SSDTfind();
+	if (!SSDT)
+	{
+		DbgPrint("[TITANHIDE] SSDT not found...\r\n");
+		return 0;
+	}
+	ULONG_PTR SSDTbase = (ULONG_PTR)SSDT->pServiceTable;
+	if (!SSDTbase)
+	{
+		DbgPrint("[TITANHIDE] ServiceTable not found...\r\n");
+		return 0;
+	}
+	int FunctionIndex = GetExportSsdtIndex(apiname);
+	if (FunctionIndex == -1)
+		return 0;
+	if ((ULONGLONG)FunctionIndex >= SSDT->NumberOfServices)
+	{
+		DbgPrint("[TITANHIDE] Invalid API offset...\r\n");
+		return 0;
+	}
+
+	HOOK hHook = 0;
+	LONG oldValue = SSDT->pServiceTable[FunctionIndex];
+	LONG newValue;
+
+#ifdef _WIN64
+	/*
+	x64 SSDT Hook;
+	1) find API addr
+	2) get code page+size
+	3) find cave address
+	4) hook cave address (using hooklib)
+	5) change SSDT value
+	*/
+
+	static ULONG CodeSize = 0;
+	static PVOID CodeStart = 0;
+	if (!CodeStart)
+	{
+		ULONG_PTR Lowest = SSDTbase;
+		ULONG_PTR Highest = Lowest + 0x0FFFFFFF;
+		DbgPrint("[TITANHIDE] Range: 0x%p-0x%p\r\n", (ULONG_PTR*)Lowest, (ULONG_PTR*)Highest);
+		CodeSize = 0;
+		CodeStart = GetPageBase(GetKernelBase(NULL), &CodeSize, (PVOID)((oldValue >> 4) + SSDTbase));
+		if (!CodeStart || !CodeSize)
+		{
+			DbgPrint("[TITANHIDE] PeGetPageBase failed...\r\n");
+			return 0;
+		}
+		DbgPrint("[TITANHIDE] CodeStart: 0x%p, CodeSize: 0x%X\r\n", CodeStart, CodeSize);
+		if ((ULONG_PTR)CodeStart < Lowest)  //start of the page is out of range (impossible, but whatever)
+		{
+			CodeSize -= (ULONG)(Lowest - (ULONG_PTR)CodeStart);
+			CodeStart = (PVOID)Lowest;
+			DbgPrint("[TITANHIDE] CodeStart: 0x%p, CodeSize: 0x%X\r\n", CodeStart, CodeSize);
+		}
+		DbgPrint("[TITANHIDE] Range: 0x%p-0x%p\r\n", CodeStart, (ULONG_PTR*)CodeStart + CodeSize);
+	}
+
+	PVOID CaveAddress = FindCaveAddress(CodeStart, CodeSize, sizeof(HOOKOPCODES));
+	if (!CaveAddress)
+	{
+		DbgPrint("[TITANHIDE] FindCaveAddress failed...\r\n");
+		return 0;
+	}
+	DbgPrint("[TITANHIDE] CaveAddress: 0x%p\r\n", CaveAddress);
+
+	hHook = Hook2(CaveAddress, (void*)newfunc);
+	if (!hHook)
+		return 0;
+
+	newValue = (LONG)((ULONG_PTR)CaveAddress - SSDTbase);
+	newValue = (newValue << 4) | oldValue & 0xF;
+
+	//update HOOK structure
+	hHook->SSDTindex = FunctionIndex;
+	hHook->SSDTold = oldValue;
+	hHook->SSDTnew = newValue;
+	hHook->SSDTaddress = (oldValue >> 4) + SSDTbase;
+
+#else
+	/*
+	x86 SSDT Hook:
+	1) change SSDT value
+	*/
+	newValue = (ULONG)newfunc;
+
+	hHook = (HOOK)RtlAllocateMemory(true, sizeof(HOOKSTRUCT));
+
+	//update HOOK structure
+	hHook->SSDTindex = FunctionIndex;
+	hHook->SSDTold = oldValue;
+	hHook->SSDTnew = newValue;
+	hHook->SSDTaddress = oldValue;
+
+#endif
+
+	RtlSuperCopyMemory(&SSDT->pServiceTable[FunctionIndex], &newValue, sizeof(newValue));
+
+	DbgPrint("[TITANHIDE] SSDThook(%s:0x%p, 0x%p)\r\n", apiname, (LONG*)hHook->SSDTold, (LONG*)hHook->SSDTnew);
+
+	return hHook;
+}
+
+bool Unhook2(HOOK hook, bool free)
+{
+	if (!hook || !hook->addr)
+		return false;
+	if (NT_SUCCESS(RtlSuperCopyMemory((void*)hook->addr, hook->orig, sizeof(HOOKOPCODES))))
+	{
+		if (free)
+			RtlFreeMemory(hook);
+		return true;
+	}
+	return false;
+}
 
 void Unhook(HOOK hHook, bool free)
 {
@@ -182,13 +329,13 @@ void Unhook(HOOK hHook, bool free)
     LONG* SSDT_Table = SSDT->pServiceTable;
     if (!SSDT_Table)
     {
-        Log("[TITANHIDE] ServiceTable not found...\r\n");
+		DbgPrint("[TITANHIDE] ServiceTable not found...\r\n");
         return;
     }
     InterlockedSet(&SSDT_Table[hHook->SSDTindex], hHook->SSDTold);
 #ifdef _WIN64
     if (free)
-        Unhook(hHook, true);
+        Unhook2(hHook, true);
 #else
     if (free)
         RtlFreeMemory(hHook);

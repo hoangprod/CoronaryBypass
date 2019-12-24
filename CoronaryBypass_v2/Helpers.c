@@ -2,6 +2,256 @@
 #include "Helpers.h"
 
 
+
+
+
+
+
+
+
+bool isThreadPrivileged()
+{
+	HANDLE TokenHandle;
+
+	NTSTATUS Status = NtOpenThreadToken(NtCurrentThread(), TOKEN_READ, false, &TokenHandle);
+
+	PTOKEN_USER pToken = 0;
+
+	ULONG returnLength = 0;
+
+	if (NT_SUCCESS(Status) && pToken)
+	{
+		pToken = (PTOKEN_USER)ExAllocatePool(NonPagedPool, 0x500);
+
+		RtlZeroMemory(pToken, 0x500);
+
+		if (pToken)
+		{
+			if (STATUS_SUCCESS == NtQueryInformationToken(TokenHandle, TokenUser, pToken, 0x500, &returnLength))
+			{
+
+			}
+			else
+			{
+				log("isThreadPrivileged NtQueryInformationToken failed.");
+			}
+
+			ExFreePool(pToken);
+		}
+
+	}
+
+}
+
+
+
+
+
+
+
+void ConvertAccessMaskToString(ACCESS_MASK mask)
+{
+	if (mask & FILE_ALL_ACCESS)
+	{
+		log("FILE_ALL_ACCESS***");
+		return;
+	}
+
+	if (mask & FILE_WRITE_DATA)
+	{
+		log("FILE_WRITE_DATA***");
+	}
+
+	if (mask & FILE_ADD_FILE)
+	{
+		log("FILE_ADD_FILE***");
+	}
+
+	if (mask & FILE_ADD_SUBDIRECTORY)
+	{
+		log("FILE_ADD_SUBDIRECTORY");
+	}
+
+	if (mask & FILE_DELETE_CHILD)
+	{
+		log("FILE_DELETE_CHILD");
+	}
+
+	if (mask & FILE_LIST_DIRECTORY)
+	{
+		log("FILE_LIST_DIRECTORY");
+	}
+
+	if (mask & FILE_WRITE_ATTRIBUTES)
+	{
+		log("FILE_WRITE_ATTRIBUTES");
+	}
+
+	if (mask & FILE_WRITE_EA)
+	{
+		log("FILE_WRITE_EA");
+	}
+
+}
+
+
+void printSID(PSID psid)
+{
+	UNICODE_STRING Sid = { 0 };
+	NTSTATUS rc = RtlConvertSidToUnicodeString(&Sid, psid, true);
+	if (NT_SUCCESS(rc))
+	{
+		log("SID belongs to = %S with length %u", Sid.Buffer, Sid.Length);
+
+		RtlFreeUnicodeString(&Sid);
+	}
+	else if (rc == STATUS_INVALID_SID)
+	{
+		log("Invalid SID.");
+	}
+	else
+	{
+		log("Convert SID failed because %d", rc);
+	}
+
+}
+
+PSID SepGetOwnerFromDescriptor(PVOID  	_Descriptor)
+{
+	PISECURITY_DESCRIPTOR Descriptor = (PISECURITY_DESCRIPTOR)_Descriptor;
+	PISECURITY_DESCRIPTOR_RELATIVE SdRel;
+
+	if (Descriptor->Control & SE_SELF_RELATIVE)
+	{
+		SdRel = (PISECURITY_DESCRIPTOR_RELATIVE)Descriptor;
+		if (!SdRel->Owner) return NULL;
+		return (PSID)((ULONG_PTR)Descriptor + SdRel->Owner);
+	}
+	else
+	{
+		return Descriptor->Owner;
+	}
+}
+
+PACL getDaclFromDescriptor(PVOID _Descriptor)
+{
+	PISECURITY_DESCRIPTOR Descriptor = (PISECURITY_DESCRIPTOR)_Descriptor;
+	PISECURITY_DESCRIPTOR_RELATIVE SdRel;
+
+	if (!(Descriptor->Control & SE_DACL_PRESENT)) return NULL;
+
+	if (Descriptor->Control & SE_SELF_RELATIVE)
+	{
+		SdRel = (PISECURITY_DESCRIPTOR_RELATIVE)Descriptor;
+		if (!SdRel->Dacl) return NULL;
+		return (PACL)((ULONG_PTR)Descriptor + SdRel->Dacl);
+	}
+	else
+	{
+		return Descriptor->Dacl;
+	}
+}
+
+
+
+bool isWriteableObject(PISECURITY_DESCRIPTOR SecurityDescriptor)
+{
+	// Means it inherit the folder's SecurityDescriptor I believe, so we must get folder's SD.
+	if (!SecurityDescriptor)
+	{
+		//DbgPrint("[69] SecurityDescriptor is null.\n");
+		return false;
+	}
+
+	if (SecurityDescriptor->Control & SE_DACL_PRESENT)
+	{
+		if ((SECURITY_DESCRIPTOR_RELATIVE*)SecurityDescriptor->Dacl)
+		{
+			PACL DaclHeader = getDaclFromDescriptor(SecurityDescriptor);
+
+			log("%p Acl Size: %hu  Count: %hu  =================", DaclHeader, DaclHeader->AclSize, DaclHeader->AceCount);
+
+			if (DaclHeader->AceCount > 0)
+			{
+				for (USHORT i = 0; i < DaclHeader->AceCount; i++)
+				{
+					PACCESS_ALLOWED_ACE pAce = 0;
+
+					RtlGetAce(DaclHeader, i, (PVOID*)&pAce);
+
+					UCHAR AceType = pAce->Header.AceType;
+
+					if (AceType == ACCESS_ALLOWED_ACE_TYPE)
+					{
+						log("Allowed Ace with Mask: %p", pAce->Mask);
+
+						printSID(&pAce->SidStart);
+
+						ConvertAccessMaskToString(pAce->Mask);
+					}
+					else if (AceType == ACCESS_DENIED_ACE_TYPE)
+					{
+						log("Denied Ace with Mask: %p", pAce->Mask);
+
+						printSID(&pAce->SidStart);
+
+						ConvertAccessMaskToString(pAce->Mask);
+					}
+					else
+					{
+						log("Some other ACE type: %hhu", AceType);
+					}
+
+				}
+
+				return true;
+			}
+		}
+	}
+	else
+	{
+		// Get DACL of parent due to inheritance
+	}
+
+	return false;
+}
+
+bool isPrivilegeProcess(HANDLE pid)
+{
+	PEPROCESS eProcess = 0;
+	NTSTATUS status = STATUS_SUCCESS;
+	DWORD Sid = 0;
+
+	if (pid)
+	{
+		status = PsLookupProcessByProcessId(pid, &eProcess);
+
+		if (NT_SUCCESS(status))
+		{
+			PACCESS_TOKEN token = PsReferencePrimaryToken(eProcess);
+			if (token)
+			{
+				status = SeQueryInformationToken(token, TokenIntegrityLevel, (PVOID*)&Sid);
+				if (NT_SUCCESS(status) && Sid)
+				{
+
+					PsDereferencePrimaryToken(token);
+
+					//DbgPrint("[69] Integrity is: %p\n", Sid);
+
+					if (Sid >= SECURITY_MANDATORY_HIGH_RID)
+						return true;
+
+					return false;
+				}
+				PsDereferencePrimaryToken(token);
+			}
+		}
+	}
+
+	return false;
+}
+
 //
 // Return Windows' build version number. WARNING: Should switch to PsGetVersion!
 //
@@ -198,7 +448,7 @@ NTSTATUS get_os_pattern(MEMORY_PATTERN_SCAN * pattern, MEMORY_PATTERN_SCAN patte
 	return STATUS_NOT_FOUND;
 }
 
-void InterlockedSet(LONG* Destination, LONG Source)
+VOID InterlockedSet(LONG* Destination, LONG Source)
 {
 	//Change memory properties.
 	PMDL g_pmdl = IoAllocateMdl(Destination, sizeof(LONG), 0, 0, NULL);

@@ -4,6 +4,7 @@
 #include "Callbacks.h"
 #include "ntdll.h"
 #include "ssdt.h"
+#include "Hooks.h"
 
 DRIVER_INITIALIZE DriverEntry;
 DRIVER_UNLOAD DriverUnload;
@@ -20,6 +21,7 @@ void DriverUnload(IN PDRIVER_OBJECT theDriverObject)
 	IoDeleteDevice(theDriverObject->DeviceObject);
 
 	Deinitialize();
+	hookDeinitialize();
 }
 
 NTSTATUS CreateCall(PDEVICE_OBJECT DeviceObject, PIRP irp)
@@ -138,6 +140,8 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT pDriverObject, IN PUNICODE_STRING theRegi
 				DbgPrint("[69] Failed to find NtContinue's Address.");
 			else
 				DbgPrint("[69] Found NtContinue at %p\n", NtCon);
+
+			hookInitialize();
 
 		}
 

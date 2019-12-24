@@ -156,6 +156,7 @@
     <ClCompile Include="Helpers.c" />
     <ClCompile Include="Coronary.c" />
     <ClCompile Include="Driver.c" />
+    <ClCompile Include="Hooks.c" />
     <ClCompile Include="ntdll.c" />
     <ClCompile Include="ssdt.c" />
   </ItemGroup>
@@ -164,6 +165,7 @@
     <ClInclude Include="Coronary.h" />
     <ClInclude Include="Global.h" />
     <ClInclude Include="Helpers.h" />
+    <ClInclude Include="Hooks.h" />
     <ClInclude Include="ntdll.h" />
     <ClInclude Include="ssdt.h" />
   </ItemGroup>

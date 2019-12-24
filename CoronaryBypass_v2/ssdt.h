@@ -28,14 +28,18 @@ typedef struct _HOOKOPCODES
 } HOOKOPCODES;
 #pragma pack(pop)
 
+
 typedef struct _HOOKSTRUCT
 {
-    ULONG_PTR addr;
-    HOOKOPCODES hook;
-    unsigned char orig[sizeof(HOOKOPCODES)];
-    LONG SSDTnew;
-    ULONG_PTR SSDTaddress;
-}HOOKSTRUCT, *HOOK;
+	ULONG_PTR addr;
+	HOOKOPCODES hook;
+	unsigned char orig[sizeof(HOOKOPCODES)];
+	//SSDT extension
+	int SSDTindex;
+	LONG SSDTold;
+	LONG SSDTnew;
+	ULONG_PTR SSDTaddress;
+}HOOKSTRUCT,*HOOK;
 
 typedef enum _SYSTEM_INFORMATION_CLASS
 {
@@ -45,4 +49,7 @@ typedef enum _SYSTEM_INFORMATION_CLASS
 
 
 SSDTStruct* SSDTfind();
+void Unhook(HOOK hHook, bool free);
 PVOID GetFunctionAddress(const char* apiname);
+HOOK Hook(const char* apiname, void* newfunc);
+HOOK hook_internal(ULONG_PTR addr, void* newfunc);
