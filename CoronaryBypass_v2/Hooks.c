@@ -68,7 +68,35 @@ static NTSTATUS NTAPI hook_NtSetSecurityObject(
 	// If Set DACL, Owner or Group
 	if (SecurityInformation == DACL_SECURITY_INFORMATION || SecurityInformation == GROUP_SECURITY_INFORMATION || SecurityInformation == OWNER_SECURITY_INFORMATION)
 	{
+		NTSTATUS rc;
+		PVOID Object;
+		char ParentDirectory[1024];
+		PUNICODE_STRING Parent = NULL;
+		ParentDirectory[0] = '\0';
+		Parent = (PUNICODE_STRING)ParentDirectory;
 
+		rc = ObReferenceObjectByHandle(Handle,
+			0,
+			0,
+			KernelMode,
+			&Object,
+			NULL);
+
+		if (rc == STATUS_SUCCESS) {
+			ULONG BytesReturned;
+			rc = ObQueryNameString(Object, (POBJECT_NAME_INFORMATION)ParentDirectory, sizeof(ParentDirectory), &BytesReturned);
+			ObDereferenceObject(Object);
+			if (rc != STATUS_SUCCESS)
+				RtlInitUnicodeString(Parent, L"Unknown\\");
+		}
+		else
+		{
+			RtlInitUnicodeString(Parent, L"Unknown\\");
+		}
+
+		HANDLE cPID = PsGetCurrentThreadId();
+
+		DbgPrint("%d NtSetSecurityObject : Filename = %S\n", cPID, Parent ? Parent->Buffer : L"");
 	}
 
 	return oNtSetSecurityObject(Handle, SecurityInformation, SecurityDescriptor);

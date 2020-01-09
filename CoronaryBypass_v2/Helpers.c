@@ -41,6 +41,8 @@ bool isThreadPrivileged()
 
 	}
 
+	return false;
+
 }
 
 
