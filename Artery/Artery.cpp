@@ -35,11 +35,6 @@ int Crash()
 
 int main()
 {
-	char* test = (char*)10;
-	DWORD* test1 = (DWORD*)10;
-	UINT_PTR* test2 = (UINT_PTR*)10;
-
-	printf("%d %d %d\n", test+1, test1+1, test2+1);
 
 	//Crash();
 	std::cin.get();

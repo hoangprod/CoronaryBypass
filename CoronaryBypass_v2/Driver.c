@@ -90,7 +90,7 @@ NTSTATUS SteakDispatchDeviceControl(IN OUT DEVICE_OBJECT* DeviceObject, IN OUT I
 		if (NT_SUCCESS(status))
 			szReallyOut = irpStack->Parameters.DeviceIoControl.OutputBufferLength - szOutBuffer;
 
-		DbgPrint("[69] Information out is %d %d %d\n", szReallyOut, irpStack->Parameters.DeviceIoControl.OutputBufferLength, szOutBuffer);
+		log("Information out is %d %d %d\n", szReallyOut, irpStack->Parameters.DeviceIoControl.OutputBufferLength, szOutBuffer);
 
 	}
 
@@ -130,16 +130,16 @@ NTSTATUS DriverEntry(IN PDRIVER_OBJECT pDriverObject, IN PUNICODE_STRING theRegi
 
 			if (!NT_SUCCESS(Initialize()))
 			{
-				DbgPrint("[69] Ntdll::Initialize() failed...\r\n");
+				log("Ntdll::Initialize() failed...\r\n");
 				return STATUS_UNSUCCESSFUL;
 			}
 
 			PVOID NtCon = GetFunctionAddress("NtContinue");
 
 			if (!NtCon)
-				DbgPrint("[69] Failed to find NtContinue's Address.");
+				log("Failed to find NtContinue's Address.");
 			else
-				DbgPrint("[69] Found NtContinue at %p\n", NtCon);
+				log("Found NtContinue at %p\n", NtCon);
 
 			hookInitialize();
 
